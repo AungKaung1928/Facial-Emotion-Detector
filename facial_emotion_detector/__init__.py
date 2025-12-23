@@ -1,0 +1,1 @@
+"""Facial emotion detection package for ROS2."""
