@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ROS2 node for facial emotion detection with live video display.
+ROS2 node for facial emotion detection using FER library.
 """
 import cv2
 import numpy as np
@@ -20,20 +20,11 @@ class EmotionDetectorNode(Node):
         
         # Parameters
         self.declare_parameter('camera_id', 0)
-        self.declare_parameter('publish_rate', 10.0)
-        
         camera_id = self.get_parameter('camera_id').value
-        cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
         
-        # Initialize classifier with configurable thresholds
-        self.classifier = EmotionClassifier(
-            cascade_path=cascade_path,
-            ear_threshold=0.55,
-            mar_threshold=0.65,
-            eyebrow_raised_threshold=120.0,
-            eyebrow_furrow_ratio=1.3
-        )
-        self.get_logger().info('✓ Emotion classifier loaded')
+        # Initialize FER classifier
+        self.classifier = EmotionClassifier()
+        self.get_logger().info('✓ FER emotion classifier loaded')
         
         # Initialize camera
         self.cap = cv2.VideoCapture(camera_id)
@@ -44,7 +35,6 @@ class EmotionDetectorNode(Node):
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
         self.cap.set(cv2.CAP_PROP_FPS, 30)
-        
         self.get_logger().info(f'✓ Camera {camera_id} opened')
         
         # Publisher
@@ -60,19 +50,21 @@ class EmotionDetectorNode(Node):
         # Create window
         cv2.namedWindow('Facial Emotion Detection', cv2.WINDOW_NORMAL)
         
-        # Timer (30 Hz)
-        self.timer = self.create_timer(1.0/30.0, self.process_and_display)
+        # Timer (15 Hz - FER is slower than Haar)
+        self.timer = self.create_timer(1.0/15.0, self.process_and_display)
         
         self.get_logger().info('✓ Emotion detector active - Press Q to quit')
-        
-        # Print guide
+        self._print_guide()
+
+    def _print_guide(self):
+        """Print emotion guide."""
         print("\n" + "="*50)
-        print("🎭 FACIAL EMOTION DETECTION")
+        print("🎭 FACIAL EMOTION DETECTION (FER/CNN)")
         print("="*50)
-        print("😊 HAPPY    - Smile wide!")
-        print("😢 SAD      - Frown and look down")
-        print("😠 ANGRY    - Furrow eyebrows, tense face")
-        print("😲 SURPRISED - Open mouth wide, raise eyebrows")
+        print("😊 HAPPY    - Smile!")
+        print("😢 SAD      - Frown, droopy face")
+        print("😠 ANGRY    - Furrow brows, tense")
+        print("😲 SURPRISED - Open mouth, raise brows")
         print("😐 NEUTRAL  - Relaxed face")
         print("="*50)
         print("Press 'Q' to quit\n")
@@ -112,14 +104,14 @@ class EmotionDetectorNode(Node):
         if len(faces) > 0:
             largest_face = max(faces, key=lambda f: f[2] * f[3])
             
-            # NEW API: Use classify_from_frame
-            detected_emotion = self.classifier.classify_from_frame(frame, tuple(largest_face))
+            # Classify emotion
+            detected_emotion = self.classifier.classify_from_frame(frame, largest_face)
             
             # Smooth
             self.current_emotion = self.smooth_emotion(detected_emotion)
             
-            # Draw
-            self.classifier.draw_face_box(frame, tuple(largest_face), 
+            # Draw face box
+            self.classifier.draw_face_box(frame, largest_face, 
                                          self.current_emotion, (0, 255, 0))
             
             # Publish
@@ -129,7 +121,7 @@ class EmotionDetectorNode(Node):
             
             # Terminal output
             emoji = self.classifier.get_emoji(self.current_emotion)
-            print(f"{emoji} {self.current_emotion.value.upper()}", flush=True, end='\r')
+            print(f"{emoji} {self.current_emotion.value.upper()}   ", end='\r')
         
         # Draw overlays
         self._draw_big_emoji(frame)
@@ -147,24 +139,19 @@ class EmotionDetectorNode(Node):
         """Draw large emoji overlay."""
         emoji = self.classifier.get_emoji(self.current_emotion)
         height, width = frame.shape[:2]
-        emoji_size = 120
-        margin = 30
         
-        x = width - emoji_size - margin
-        y = margin
+        x = width - 150
+        y = 30
         
         overlay = frame.copy()
-        cv2.rectangle(overlay, (x - 20, y - 20),
-                     (x + emoji_size + 20, y + emoji_size + 20),
-                     (255, 255, 255), -1)
+        cv2.rectangle(overlay, (x - 20, y - 20), (x + 140, y + 140), (255, 255, 255), -1)
         cv2.addWeighted(overlay, 0.7, frame, 0.3, 0, frame)
         
-        cv2.putText(frame, emoji, (x, y + 90),
-                   cv2.FONT_HERSHEY_SIMPLEX, 3.5, (0, 0, 0), 4)
+        cv2.putText(frame, emoji, (x, y + 90), cv2.FONT_HERSHEY_SIMPLEX, 3.5, (0, 0, 0), 4)
 
     def _draw_emotion_text(self, frame: np.ndarray):
         """Draw emotion text at bottom."""
-        emotion_text = f"{self.current_emotion.value.upper()}"
+        emotion_text = self.current_emotion.value.upper()
         emoji = self.classifier.get_emoji(self.current_emotion)
         
         height, width = frame.shape[:2]
@@ -177,8 +164,7 @@ class EmotionDetectorNode(Node):
         y = height - 40
         
         overlay = frame.copy()
-        cv2.rectangle(overlay, (x - 20, y - text_h - 20),
-                     (x + text_w + 20, y + 20), (0, 0, 0), -1)
+        cv2.rectangle(overlay, (x - 20, y - text_h - 20), (x + text_w + 20, y + 20), (0, 0, 0), -1)
         cv2.addWeighted(overlay, 0.6, frame, 0.4, 0, frame)
         
         cv2.putText(frame, text, (x, y), font, 1.5, (255, 255, 255), 3)
@@ -186,8 +172,7 @@ class EmotionDetectorNode(Node):
     def _draw_fps(self, frame: np.ndarray):
         """Draw FPS counter."""
         fps_text = f'FPS: {self.fps:.1f}'
-        cv2.putText(frame, fps_text, (10, 30),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+        cv2.putText(frame, fps_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
 
     def destroy_node(self):
         """Clean up resources."""

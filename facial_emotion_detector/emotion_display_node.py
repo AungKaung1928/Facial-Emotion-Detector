@@ -170,7 +170,7 @@ class EmotionDisplayNode(Node):
         
         # Draw emotion text
         emotion_text = self.current_emotion.value.upper()
-        font = cv2.FONT_HERSHEY_BOLD
+        font = cv2.FONT_HERSHEY_SIMPLEX
         font_scale = 0.7
         thickness = 2
         
