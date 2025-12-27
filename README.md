@@ -77,14 +77,21 @@ source install/setup.bash
 
 ## Usage
 
-### Basic Usage (Recommended)
+### Method 1: Using Launch File (Recommended)
+
+```bash
+# Run with launch file
+ros2 launch facial_emotion_detector emotion_detection.launch.py
+```
+
+### Method 2: Direct Node Execution
 
 ```bash
 # Run detector with live video display
 ros2 run facial_emotion_detector emotion_detector
 ```
 
-This opens a webcam window showing:
+Both methods open a webcam window showing:
 
 - Your face with green bounding box
 - Current emotion label on face box
