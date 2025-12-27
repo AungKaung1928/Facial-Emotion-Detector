@@ -1,34 +1,5 @@
 # Facial Emotion Detection System
 
-## Code Structure
-
-```
-facial_emotion_ws/
-├── src/
-│   └── facial_emotion_detector/
-│       ├── facial_emotion_detector/
-│       │   ├── __init__.py                    # Package initialization
-│       │   ├── emotion_classifier.py          # FER-based CNN emotion classifier
-│       │   ├── emotion_detector_node.py       # ROS2 node with video display
-│       │   └── emotion_display_node.py        # Alternative display node
-│       ├── launch/
-│       │   └── emotion_detection.launch.py    # Launch file for multiple nodes
-│       ├── resource/
-│       │   └── facial_emotion_detector        # Package resource marker
-│       ├── test/
-│       │   ├── test_copyright.py              # Copyright validation
-│       │   ├── test_flake8.py                 # Code style checks
-│       │   ├── test_pep257.py                 # Docstring validation
-│       │   └── test_emotion_classifier.py     # Unit tests for emotion logic
-│       ├── package.xml                        # ROS2 package dependencies
-│       ├── setup.py                           # Python package setup
-│       ├── setup.cfg                          # Package configuration
-│       └── README.md                          # Documentation
-├── build/                                     # Build artifacts
-├── install/                                   # Installed files
-└── log/                                       # Build and runtime logs
-```
-
 ## Overview
 
 Real-time facial emotion detection system using ROS2 Humble, OpenCV, TensorFlow, and Python. Detects 5 emotions (happy, sad, angry, surprised, neutral) from webcam feed using FER library with pre-trained CNN model (trained on FER2013 dataset).
@@ -176,6 +147,35 @@ emotion_detector_node
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `camera_id` | int | 0 | Camera device index |
+
+### Package Structure
+
+```
+facial_emotion_ws/
+├── src/
+│   └── facial_emotion_detector/
+│       ├── facial_emotion_detector/
+│       │   ├── __init__.py                    # Package initialization
+│       │   ├── emotion_classifier.py          # FER-based CNN emotion classifier
+│       │   ├── emotion_detector_node.py       # ROS2 node with video display
+│       │   └── emotion_display_node.py        # Alternative display node
+│       ├── launch/
+│       │   └── emotion_detection.launch.py    # Launch file for multiple nodes
+│       ├── resource/
+│       │   └── facial_emotion_detector        # Package resource marker
+│       ├── test/
+│       │   ├── test_copyright.py              # Copyright validation
+│       │   ├── test_flake8.py                 # Code style checks
+│       │   ├── test_pep257.py                 # Docstring validation
+│       │   └── test_emotion_classifier.py     # Unit tests for emotion logic
+│       ├── package.xml                        # ROS2 package dependencies
+│       ├── setup.py                           # Python package setup
+│       ├── setup.cfg                          # Package configuration
+│       └── README.md                          # Documentation
+├── build/                                     # Build artifacts
+├── install/                                   # Installed files
+└── log/                                       # Build and runtime logs
+```
 
 ## Technical Details
 
