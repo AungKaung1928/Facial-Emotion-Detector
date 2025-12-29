@@ -1,4 +1,4 @@
-# Facial Emotion Detection System
+# Facial Emotion Detection System Project
 
 ## Overview
 
