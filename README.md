@@ -48,12 +48,19 @@ sudo apt install -y \
 ### Python Packages
 
 `fer` pulls in TensorFlow (about 600 MB). Keep it out of the system Python: use a venv that can
-still see the apt-installed `rclpy`.
+still see the apt-installed `rclpy`. `--without-pip` sidesteps the missing `python3-venv`
+package on stock Ubuntu (the venv reuses the system pip), and `--no-deps` on `fer` skips its
+`facenet-pytorch` dependency, which would otherwise download a multi-GB CUDA torch build for the
+MTCNN option this project never uses.
 
 ```bash
-python3 -m venv --system-site-packages ~/.venv-fer
-~/.venv-fer/bin/pip install fer
+python3 -m venv --without-pip --system-site-packages ~/.venv-fer
+~/.venv-fer/bin/python3 -m pip install --no-deps fer
+~/.venv-fer/bin/python3 -m pip install tensorflow-cpu requests pillow
+~/.venv-fer/bin/python3 -c "from fer.fer import FER; import numpy as np; print(FER(mtcnn=False).detect_emotions(np.zeros((480,640,3),np.uint8)))"
 ```
+The last line must print `[]` (model loaded, no face in a black frame). Verified with fer 25.10.3
+and tensorflow-cpu 2.21 on Python 3.10.
 
 ## Installation
 
