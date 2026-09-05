@@ -57,17 +57,10 @@ class EmotionDetectorNode(Node):
         self._print_guide()
 
     def _print_guide(self):
-        """Print emotion guide."""
-        print("\n" + "="*50)
-        print("🎭 FACIAL EMOTION DETECTION (FER/CNN)")
-        print("="*50)
-        print("😊 HAPPY    - Smile!")
-        print("😢 SAD      - Frown, droopy face")
-        print("😠 ANGRY    - Furrow brows, tense")
-        print("😲 SURPRISED - Open mouth, raise brows")
-        print("😐 NEUTRAL  - Relaxed face")
-        print("="*50)
-        print("Press 'Q' to quit\n")
+        """Log the expression guide once."""
+        self.get_logger().info(
+            'HAPPY: smile | SAD: frown, look down | ANGRY: furrow brows | '
+            'SURPRISED: open mouth, raise brows | NEUTRAL: relax. Press Q in the window to quit.')
 
     def smooth_emotion(self, emotion: Emotion) -> Emotion:
         """Smooth detection using 5-frame history."""
@@ -119,9 +112,8 @@ class EmotionDetectorNode(Node):
             msg.data = self.current_emotion.value
             self.publisher.publish(msg)
             
-            # Terminal output
-            emoji = self.classifier.get_emoji(self.current_emotion)
-            print(f"{emoji} {self.current_emotion.value.upper()}   ", end='\r')
+            self.get_logger().info(
+                f'{self.current_emotion.value}', throttle_duration_sec=1.0)
         
         # Draw overlays
         self._draw_big_emoji(frame)
@@ -189,9 +181,10 @@ def main(args=None):
         node = EmotionDetectorNode()
         rclpy.spin(node)
     except KeyboardInterrupt:
-        print("\n✓ Shutting down emotion detector")
-    except Exception as e:
-        print(f"✗ Error: {e}")
+        pass
+    except Exception as e:  # camera or model failure: report and exit non-zero
+        rclpy.logging.get_logger('emotion_detector').error(f'{e}')
+        raise
     finally:
         cv2.destroyAllWindows()
         rclpy.try_shutdown()

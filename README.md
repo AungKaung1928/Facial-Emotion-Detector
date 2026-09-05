@@ -2,17 +2,27 @@
 
 ## Overview
 
-Real-time facial emotion detection system using ROS2 Humble, OpenCV, TensorFlow, and Python. Detects 5 emotions (happy, sad, angry, surprised, neutral) from webcam feed using FER library with pre-trained CNN model (trained on FER2013 dataset).
+Real-time facial emotion detection with ROS 2 Humble, OpenCV and the `fer` library (a
+pre-trained FER2013 CNN behind a Haar face detector). Maps the seven FER scores to five classes
+(happy, sad, angry, surprised, neutral), smooths over 5 frames and publishes `/facial_emotion`.
+
+**Accuracy, honestly:** FER2013 is a hard 48x48 grayscale dataset; the best published models
+reach about 73 % on it and the `fer` package model sits around 65 %. On a webcam the useful
+classes are HAPPY, SURPRISED and NEUTRAL; SAD and ANGRY are under-reported, so the decision
+thresholds in `EmotionClassifier.decide()` are deliberately biased toward them (see the
+constants at the top of the class). Expect confident smiles and open-mouth surprise to be right,
+and sad/angry to flip with lighting and head pose. It is a demo of the ROS 2 pipeline, not a
+calibrated classifier.
 
 ## Features
 
-- **FER CNN-based classification**: Pre-trained deep learning model for accurate emotion detection
+- **FER CNN-based classification**: pre-trained FER2013 model via the `fer` package
 - **Real-time detection**: 15 Hz video processing with smooth emotion tracking
 - **5 emotion classes**: Happy 😊, Sad 😢, Angry 😠, Surprised 😲, Neutral 😐
 - **Live video display**: Webcam feed with face bounding boxes and emotion labels
 - **Emoji overlays**: Large emoji indicator in video feed
 - **ROS2 integration**: Publishes detected emotions to `/facial_emotion` topic
-- **Production-grade architecture**: Type hints, clean code structure
+- **Unit-tested decision logic**: `decide()` is a pure function on the score dict; tests run without TensorFlow or a camera
 - **Emotion smoothing**: 5-frame history-based filtering for stable detection
 
 ## System Requirements
@@ -37,11 +47,13 @@ sudo apt install -y \
 
 ### Python Packages
 
-```bash
-pip3 install fer --break-system-packages
-```
+`fer` pulls in TensorFlow (about 600 MB). Keep it out of the system Python: use a venv that can
+still see the apt-installed `rclpy`.
 
-This installs FER library with TensorFlow and other dependencies.
+```bash
+python3 -m venv --system-site-packages ~/.venv-fer
+~/.venv-fer/bin/pip install fer
+```
 
 ## Installation
 
@@ -77,38 +89,44 @@ source install/setup.bash
 
 ## Usage
 
-### Method 1: Using Launch File (Recommended)
-
-```bash
-# Run with launch file
-ros2 launch facial_emotion_detector emotion_detection.launch.py
-```
-
-### Method 2: Direct Node Execution
-
-```bash
-# Run detector with live video display
-ros2 run facial_emotion_detector emotion_detector
-```
-
-Both methods open a webcam window showing:
-
-- Your face with green bounding box
-- Current emotion label on face box
-- Large emoji in top-right corner
-- Emotion text with emoji at bottom
-- FPS counter in top-left
-
-Press **'Q'** to quit.
-
-### Monitor Emotion Topic
-
-In a separate terminal:
+`ros2 run` uses the system interpreter, so start the node with the venv's Python instead:
 
 ```bash
 source ~/facial_emotion_ws/install/setup.bash
-ros2 topic echo /facial_emotion
+~/.venv-fer/bin/python3 -m facial_emotion_detector.emotion_detector_node --ros-args -p camera_id:=0
 ```
+The launch file works when `fer` is installed system-wide:
+```bash
+ros2 launch facial_emotion_detector emotion_detection.launch.py
+```
+A window shows the face box, emotion label, emoji and FPS. Press **Q** to quit.
+
+Run only one camera client at a time: `emotion_display` is an alternative viewer that opens the
+same device and will fail with "Camera not available" if the detector already holds it.
+
+### How to test
+1. **Logic, no hardware** (runs in CI):
+   ```bash
+   python3 -m pytest test/test_emotion_classifier.py
+   ```
+2. **Model + camera, one frame** (prints the raw FER scores so you can judge the thresholds):
+   ```bash
+   ~/.venv-fer/bin/python3 - <<'PY'
+   import cv2
+   from fer.fer import FER
+   cap = cv2.VideoCapture(0); ok, frame = cap.read(); cap.release()
+   assert ok, "camera 0 gave no frame"
+   for face in FER(mtcnn=False).detect_emotions(frame):
+       print(face["box"], {k: round(v, 2) for k, v in face["emotions"].items()})
+   PY
+   ```
+   No output = no face found (light your face, look at the camera).
+3. **ROS 2 pipeline**: start the node, then in another terminal
+   ```bash
+   ros2 topic echo /facial_emotion
+   ```
+   and act out the guide below. Pass = HAPPY and SURPRISED switch within a second; NEUTRAL at
+   rest. SAD/ANGRY are best-effort.
 
 ## Emotion Detection Guide
 

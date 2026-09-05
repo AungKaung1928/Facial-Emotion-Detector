@@ -5,8 +5,7 @@ Tuned for easier SAD and ANGRY detection.
 import cv2
 import numpy as np
 from enum import Enum
-from typing import Tuple, Optional, List
-from fer.fer import FER
+from typing import Dict, List, Tuple
 
 
 class Emotion(Enum):
@@ -42,8 +41,20 @@ class EmotionClassifier:
         "neutral": Emotion.NEUTRAL
     }
 
+    # Decision thresholds on FER softmax scores. Deliberately biased toward SAD and ANGRY,
+    # which the FER2013 model under-reports on webcam frames.
+    HAPPY_MIN = 0.5
+    SURPRISE_MIN = 0.4
+    SAD_MIN = 0.25
+    ANGRY_MIN = 0.15
+    SAD_SECONDARY = 0.2
+    ANGRY_SECONDARY = 0.1
+    NEUTRAL_MIN = 0.3
+
     def __init__(self, cascade_path: str = None):
-        """Initialize FER detector."""
+        """Load the FER detector (Haar face detector + FER2013 CNN). Imported lazily so the
+        decision logic can be unit-tested without TensorFlow installed."""
+        from fer.fer import FER
         self.detector = FER(mtcnn=False)
 
     def detect_faces(self, frame: np.ndarray) -> List[Tuple[int, int, int, int]]:
@@ -85,55 +96,35 @@ class EmotionClassifier:
         else:
             emotions = result[0]["emotions"]
         
-        # Get scores
-        angry_score = emotions.get("angry", 0)
-        sad_score = emotions.get("sad", 0)
-        happy_score = emotions.get("happy", 0)
-        surprise_score = emotions.get("surprise", 0)
-        neutral_score = emotions.get("neutral", 0)
-        fear_score = emotions.get("fear", 0)
-        disgust_score = emotions.get("disgust", 0)
-        
-        # Boost SAD detection - combine with fear (both have droopy features)
-        sad_combined = sad_score + fear_score * 0.3
-        
-        # Boost ANGRY detection - combine with disgust
-        angry_combined = angry_score + disgust_score * 0.5
-        
-        # Priority detection with lower thresholds
-        
-        # HAPPY - needs to be clearly dominant
-        if happy_score > 0.5:
+        return self.decide(emotions)
+
+    @classmethod
+    def decide(cls, emotions: Dict[str, float]) -> Emotion:
+        """Map one FER score dict (angry, disgust, fear, happy, sad, surprise, neutral) to an
+        Emotion. Pure function; this is what the unit tests exercise."""
+        happy = emotions.get("happy", 0.0)
+        surprise = emotions.get("surprise", 0.0)
+        neutral = emotions.get("neutral", 0.0)
+        # fear shares droopy features with sad, disgust shares tension with angry
+        sad = emotions.get("sad", 0.0) + 0.3 * emotions.get("fear", 0.0)
+        angry = emotions.get("angry", 0.0) + 0.5 * emotions.get("disgust", 0.0)
+
+        if happy > cls.HAPPY_MIN:
             return Emotion.HAPPY
-        
-        # SURPRISED - wide open features
-        if surprise_score > 0.4:
+        if surprise > cls.SURPRISE_MIN:
             return Emotion.SURPRISED
-        
-        # SAD - lower threshold, easier to trigger
-        # Triggers if sad is noticeable AND not clearly angry
-        if sad_combined > 0.25 and angry_combined < sad_combined:
+        if sad > cls.SAD_MIN and angry < sad:
             return Emotion.SAD
-        
-        # ANGRY - lower threshold, easier to trigger
-        # Triggers if angry is noticeable AND not clearly sad
-        if angry_combined > 0.15 and sad_combined < angry_combined:
+        if angry > cls.ANGRY_MIN and sad < angry:
             return Emotion.ANGRY
-        
-        # Secondary check - if either is present at all
-        if sad_combined > 0.2 and sad_combined > angry_combined:
+        if sad > cls.SAD_SECONDARY and sad > angry:
             return Emotion.SAD
-        
-        if angry_combined > 0.1 and angry_combined > sad_combined:
+        if angry > cls.ANGRY_SECONDARY and angry > sad:
             return Emotion.ANGRY
-        
-        # NEUTRAL - default
-        if neutral_score > 0.3:
+        if neutral > cls.NEUTRAL_MIN:
             return Emotion.NEUTRAL
-        
-        # Fallback - pick highest
-        fer_emotion = max(emotions, key=emotions.get)
-        return self.FER_TO_EMOTION.get(fer_emotion, Emotion.NEUTRAL)
+        fer_emotion = max(emotions, key=emotions.get) if emotions else "neutral"
+        return cls.FER_TO_EMOTION.get(fer_emotion, Emotion.NEUTRAL)
 
     def get_emoji(self, emotion: Emotion) -> str:
         """Get emoji for emotion."""
