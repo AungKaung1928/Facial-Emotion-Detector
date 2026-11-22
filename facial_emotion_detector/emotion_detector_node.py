@@ -7,6 +7,8 @@ import numpy as np
 
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import qos_profile_sensor_data
+from sensor_msgs.msg import Image
 from std_msgs.msg import String
 
 from facial_emotion_detector.emotion_classifier import EmotionClassifier, Emotion
@@ -20,22 +22,26 @@ class EmotionDetectorNode(Node):
         
         # Parameters
         self.declare_parameter('camera_id', 0)
+        # Non-empty: subscribe to this image topic instead of opening a camera (sim, bag, tests).
+        self.declare_parameter('image_topic', '')
+        self.declare_parameter('show_window', True)
         camera_id = self.get_parameter('camera_id').value
+        image_topic = self.get_parameter('image_topic').value
+        self.show_window = self.get_parameter('show_window').value
         
         # Initialize FER classifier
         self.classifier = EmotionClassifier()
         self.get_logger().info('✓ FER emotion classifier loaded')
         
-        # Initialize camera
-        self.cap = cv2.VideoCapture(camera_id)
-        if not self.cap.isOpened():
-            self.get_logger().error(f'✗ Failed to open camera {camera_id}')
-            raise RuntimeError('Camera not available')
-        
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-        self.cap.set(cv2.CAP_PROP_FPS, 30)
-        self.get_logger().info(f'✓ Camera {camera_id} opened')
+        self.cap = None
+        if image_topic:
+            from cv_bridge import CvBridge
+            self.bridge = CvBridge()
+            self.image_sub = self.create_subscription(
+                Image, image_topic, self._on_image, qos_profile_sensor_data)
+            self.get_logger().info(f'✓ Reading images from {image_topic}')
+        else:
+            self._open_camera(camera_id)
         
         # Publisher
         self.publisher = self.create_publisher(String, '/facial_emotion', 10)
@@ -47,14 +53,28 @@ class EmotionDetectorNode(Node):
         self.fps = 0.0
         self.last_time = self.get_clock().now()
         
-        # Create window
-        cv2.namedWindow('Facial Emotion Detection', cv2.WINDOW_NORMAL)
-        
-        # Timer (15 Hz - FER is slower than Haar)
-        self.timer = self.create_timer(1.0/15.0, self.process_and_display)
+        if self.show_window:
+            cv2.namedWindow('Facial Emotion Detection', cv2.WINDOW_NORMAL)
         
         self.get_logger().info('✓ Emotion detector active - Press Q to quit')
         self._print_guide()
+
+    def _open_camera(self, camera_id):
+        """Camera source: open the device and read it at 15 Hz (FER is slower than Haar)."""
+        self.cap = cv2.VideoCapture(camera_id)
+        if not self.cap.isOpened():
+            self.get_logger().error(f'✗ Failed to open camera {camera_id}')
+            raise RuntimeError('Camera not available')
+        
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+        self.cap.set(cv2.CAP_PROP_FPS, 30)
+        self.get_logger().info(f'✓ Camera {camera_id} opened')
+        self.timer = self.create_timer(1.0/15.0, self.process_and_display)
+
+    def _on_image(self, msg: Image):
+        """Image-topic source."""
+        self._handle(self.bridge.imgmsg_to_cv2(msg, 'bgr8'))
 
     def _print_guide(self):
         """Log the expression guide once."""
@@ -83,6 +103,10 @@ class EmotionDetectorNode(Node):
         ret, frame = self.cap.read()
         if not ret or frame is None:
             return
+        self._handle(frame)
+
+    def _handle(self, frame: np.ndarray):
+        """Detect, classify, publish, and (if show_window) display one frame."""
         
         # Calculate FPS
         current_time = self.get_clock().now()
@@ -120,9 +144,9 @@ class EmotionDetectorNode(Node):
         self._draw_emotion_text(frame)
         self._draw_fps(frame)
         
-        # Display
+        if not self.show_window:
+            return
         cv2.imshow('Facial Emotion Detection', frame)
-        
         if cv2.waitKey(1) & 0xFF == ord('q'):
             self.get_logger().info('Quitting...')
             raise KeyboardInterrupt
