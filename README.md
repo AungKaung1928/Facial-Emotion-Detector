@@ -28,14 +28,16 @@ colcon build --packages-select facial_emotion_detector
 ```bash
 python3 -m venv --without-pip --system-site-packages ~/.venv-fer
 ~/.venv-fer/bin/python3 -m pip install --no-deps fer
-~/.venv-fer/bin/python3 -m pip install tensorflow-cpu requests pillow
+~/.venv-fer/bin/python3 -m pip install tensorflow-cpu requests pillow "opencv-python-headless<5"
 ~/.venv-fer/bin/python3 -c "from fer.fer import FER; import numpy as np; print(FER(mtcnn=False).detect_emotions(np.zeros((480,640,3),np.uint8)))"
 ```
 The last line must print `[]` (model loaded, no face in a black frame). Verified with fer 25.10.3
 
-The venv uses the apt OpenCV (4.5 on Ubuntu 22.04). If you install OpenCV with pip instead, keep it below 5 (`"opencv-python-headless<5"`): OpenCV 5 has no `cv2.CascadeClassifier`, which `fer`'s face detector uses (CI run 1012217 failed with `module 'cv2' has no attribute 'CascadeClassifier'`; green with `<5`).
+Why pip OpenCV in the venv, below 5: Ubuntu's apt `python3-opencv` has no `cv2.data`, which `fer` uses to find its face cascade (CI d39c0bf: `module 'cv2' has no attribute 'data'`), and OpenCV 5 has no `cv2.CascadeClassifier` (CI 1012217). With `opencv-python-headless<5` both CI jobs pass.
 
 ![fer scores and the node's decision for one public-domain test photo, from CI](docs/emotion.svg)
+
+Without a camera: `ros2 run facial_emotion_detector emotion_detector --ros-args -p image_topic:=/camera/image_raw -p show_window:=false` reads an image topic instead of opening `camera_id`. `test/test_launch_image_topic.py` uses this to feed the astronaut photo to the installed node; CI expects `happy` on `/facial_emotion` (run 33a5bdd).
 
 CI job `real-model` runs this install and the repo's `EmotionClassifier` on scikit-image's `astronaut()` photo (NASA, public domain): one face, `happy` 1.00, decision HAPPY (`scripts/real_model_demo.py`, run 69bd29c).
 and tensorflow-cpu 2.21 on Python 3.10.

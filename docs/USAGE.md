@@ -46,6 +46,8 @@ emotion_detector_node
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `camera_id` | int | 0 | Camera device index |
+| `image_topic` | string | `''` | Non-empty: subscribe to this `sensor_msgs/Image` topic (bgr8) instead of opening `camera_id` |
+| `show_window` | bool | true | Show the OpenCV window; false for headless runs |
 
 ### Package Structure
 
