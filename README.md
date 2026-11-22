@@ -32,6 +32,12 @@ python3 -m venv --without-pip --system-site-packages ~/.venv-fer
 ~/.venv-fer/bin/python3 -c "from fer.fer import FER; import numpy as np; print(FER(mtcnn=False).detect_emotions(np.zeros((480,640,3),np.uint8)))"
 ```
 The last line must print `[]` (model loaded, no face in a black frame). Verified with fer 25.10.3
+
+The venv uses the apt OpenCV (4.5 on Ubuntu 22.04). If you install OpenCV with pip instead, keep it below 5 (`"opencv-python-headless<5"`): OpenCV 5 has no `cv2.CascadeClassifier`, which `fer`'s face detector uses (CI run 1012217 failed with `module 'cv2' has no attribute 'CascadeClassifier'`; green with `<5`).
+
+![fer scores and the node's decision for one public-domain test photo, from CI](docs/emotion.svg)
+
+CI job `real-model` runs this install and the repo's `EmotionClassifier` on scikit-image's `astronaut()` photo (NASA, public domain): one face, `happy` 1.00, decision HAPPY (`scripts/real_model_demo.py`, run 69bd29c).
 and tensorflow-cpu 2.21 on Python 3.10.
 
 Run (`ros2 run` would use the system Python, so start it with the venv's):
