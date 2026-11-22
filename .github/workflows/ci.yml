@@ -6,6 +6,7 @@ on:
 jobs:
   logic-tests:
     runs-on: ubuntu-22.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -16,6 +17,7 @@ jobs:
   real-model:
     # The README quick start's fer install, then the repo's classifier on one public-domain test photo.
     runs-on: ubuntu-22.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -33,6 +35,7 @@ jobs:
             emotion.json
   build:
     runs-on: ubuntu-22.04
+    timeout-minutes: 30
     container: ros:humble
     defaults:
       run:
