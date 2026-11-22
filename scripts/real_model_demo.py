@@ -16,12 +16,12 @@ clf = EmotionClassifier()
 faces = clf.detector.detect_emotions(frame)
 if not faces:
     sys.exit('no face detected')
-scores = faces[0]['emotions']
+scores = {k: float(v) for k, v in faces[0]['emotions'].items()}
 decision = clf.decide(scores)
-print(json.dumps({'faces': len(faces), 'box': faces[0]['box'], 'scores': scores, 'decision': decision.name}))
+result = {'faces': len(faces), 'box': [int(v) for v in faces[0]['box']], 'scores': scores, 'decision': decision.name}
+print(json.dumps(result))
 if len(sys.argv) > 2:
-    json.dump({'faces': len(faces), 'box': [int(v) for v in faces[0]['box']], 'scores': scores,
-               'decision': decision.name}, open(sys.argv[2], 'w'), indent=1)
+    json.dump(result, open(sys.argv[2], 'w'), indent=1)
 
 W, L, BW, RH = 520, 90, 340, 26
 rows = sorted(scores.items(), key=lambda kv: -kv[1])
