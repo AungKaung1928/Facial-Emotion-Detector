@@ -1,0 +1,39 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  logic-tests:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - run: pip install numpy opencv-python-headless pytest
+      - run: python -m pytest -q test/test_emotion_classifier.py
+  build:
+    runs-on: ubuntu-22.04
+    container: ros:humble
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: src/facial_emotion_detector
+      - name: Install dependencies (README quick start)
+        run: |
+          apt-get update
+          rosdep update
+          rosdep install --from-paths src --ignore-src -y
+      - name: Build
+        run: |
+          source /opt/ros/humble/setup.bash
+          colcon build --packages-select facial_emotion_detector --event-handlers console_direct+
+      - name: Node and launch file installed
+        run: |
+          source install/setup.bash
+          ros2 pkg executables facial_emotion_detector | grep -q emotion_detector
+          test -f install/facial_emotion_detector/share/facial_emotion_detector/launch/emotion_detection.launch.py
