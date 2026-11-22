@@ -57,9 +57,9 @@ jobs:
           test -f install/facial_emotion_detector/share/facial_emotion_detector/launch/emotion_detection.launch.py
       - name: Node on an image topic, real model (no camera, no window)
         run: |
-          apt-get install -y python3-pip python3-opencv
+          apt-get install -y python3-pip
           pip3 install --no-deps fer
-          pip3 install "numpy<2" tensorflow-cpu==2.15.1 scikit-image==0.21.0 requests pillow  # cv_bridge here is built on NumPy 1
+          pip3 install "numpy<2" tensorflow-cpu==2.15.1 scikit-image==0.21.0 requests pillow "opencv-python-headless<5"  # cv_bridge here is built on NumPy 1; apt python3-opencv has no cv2.data, which fer needs
           source install/setup.bash
           cd src/facial_emotion_detector
           launch_test test/test_launch_image_topic.py
