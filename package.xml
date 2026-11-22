@@ -4,7 +4,7 @@
   <name>facial_emotion_detector</name>
   <version>1.0.0</version>
   <description>Real-time facial emotion detection using ROS2 and OpenCV</description>
-  <maintainer email="allkg@example.com">allkg</maintainer>
+  <maintainer email="dev@example.com">Developer</maintainer>
   <license>MIT</license>
 
   <buildtool_depend>ament_python</buildtool_depend>
